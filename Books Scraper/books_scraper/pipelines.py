@@ -6,6 +6,7 @@
 
 # useful for handling different item types with a single interface
 from itemadapter import ItemAdapter
+import mysql.connector
 
 
 class BooksScraperPipeline:
@@ -62,3 +63,62 @@ class BooksScraperPipeline:
             adapter['stars'] = 5
 
         return item
+
+
+class SaveToMySQLPipeline:
+
+    def __init__(self):
+        self.conn = mysql.connector.connect(
+            host='localhost',
+            user='root',
+            password='password',
+            database='books'
+        )
+
+        self.cur = self.conn.cursor()
+
+        self.cur.execute("""
+        CREATE TABLE IF NOT EXISTS books(
+            id INT PRIMARY KEY AUTO_INCREMENT,
+            url VARCHAR(255),
+            title TEXT,
+            price DECIMAL,
+            stars INTEGER,
+            category VARCHAR(255),
+            upc VARCHAR(255),
+            product_type VARCHAR(255),
+            price_excl_tax DECIMAL,
+            price_incl_tax DECIMAL,
+            tax DECIMAL,
+            availability INTEGER,
+            num_reviews INTEGER
+        )
+        """)
+
+    def process_item(self, item, spider):
+        self.cur.execute("""
+        INSERT INTO books (
+            url, title, price, stars, category, upc, product_type,
+            price_excl_tax, price_incl_tax, tax, availability, num_reviews
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (
+            item["url"],
+            item["title"],
+            item["price"],
+            item["stars"],
+            item["category"],
+            item["upc"],
+            item["product_type"],
+            item["price_excl_tax"],
+            item["price_incl_tax"],
+            item["tax"],
+            item["availability"],
+            item["num_reviews"]
+        ))
+
+        self.conn.commit()
+
+    def close_spider(self, spider):
+        self.cur.close()
+        self.conn.close()
